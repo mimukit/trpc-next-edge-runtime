@@ -2,10 +2,10 @@
  * This is the API-handler of your app that contains all your API routes.
  * On a bigger app, you will probably want to split this file up into multiple files.
  */
-import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
-import { NextRequest } from 'next/server';
-import { z } from 'zod';
-import { publicProcedure, router } from '~/server/trpc';
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { publicProcedure, router } from "~/server/trpc";
 
 const appRouter = router({
   greeting: publicProcedure
@@ -14,19 +14,19 @@ const appRouter = router({
     .input(
       z.object({
         name: z.string().nullish(),
-      }),
+      })
     )
     .query(({ input }) => {
       // This is what you're returning to your client
       return {
-        text: `hello ${input?.name ?? 'world'}`,
+        text: `hello ${input?.name ?? "world"}`,
         // 💡 Tip: Try adding a new property here and see it propagate to the client straight-away
       };
     }),
   // 💡 Tip: Try adding a new procedure here and see if you can use it in the client!
-  // getUser: t.procedure.query(() => {
-  //   return { id: '1', name: 'bob' };
-  // }),
+  getUser: publicProcedure.query(() => {
+    return { id: "1", name: "bob" };
+  }),
 });
 
 // export only the type definition of the API
@@ -35,15 +35,29 @@ export type AppRouter = typeof appRouter;
 
 // We're using the edge-runtime
 export const config = {
-  runtime: 'edge',
+  runtime: "edge",
 };
 
 // export API handler
 export default async function handler(req: NextRequest) {
   return fetchRequestHandler({
-    endpoint: '/api/trpc',
+    endpoint: "/api/trpc",
     router: appRouter,
     req,
     createContext: () => ({}),
+    responseMeta({ ctx, errors }) {
+      if (errors.length) {
+        // propagate http first error from API calls
+        return {
+          status: 500,
+        };
+      }
+      // cache request for 1 day + revalidate once every second
+      return {
+        headers: {
+          "cache-control": "max-age=0, s-maxage=60",
+        },
+      };
+    },
   });
 }
